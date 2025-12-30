@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ca">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#111111" />
+  <meta name="description" content="FIV en Calma: microaccions diàries per regular el cervell i recuperar energia durant un procés de FIV." />
+  <title>FIV en Calma</title>
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div class="app-title">
+      <div class="logo-dot" aria-hidden="true"></div>
+      <div>
+        <div class="title">FIV en Calma</div>
+        <div class="subtitle" id="subtitle">Microaccions per regular-te (FIV)</div>
+      </div>
+    </div>
+    <button class="ghost" id="btnSettings" aria-label="Configuració">⚙️</button>
+  </header>
+
+  <main id="view" class="view" role="main"></main>
+
+  <nav class="bottom-nav" role="navigation" aria-label="Navegació principal">
+    <button class="tab active" data-tab="today">Avui</button>
+    <button class="tab" data-tab="tools">Eines</button>
+    <button class="tab" data-tab="progress">Progrés</button>
+    <button class="tab" data-tab="partner">Parella</button>
+  </nav>
+
+  <div id="modal" class="modal hidden" role="dialog" aria-modal="true" aria-hidden="true">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title" id="modalTitle">Títol</div>
+        <button class="ghost" id="modalClose" aria-label="Tancar">✕</button>
+      </div>
+      <div class="modal-body" id="modalBody"></div>
+    </div>
+  </div>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
