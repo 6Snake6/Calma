@@ -174,6 +174,7 @@
     else if (safeTab === "tools") renderTools();
     else if (safeTab === "progress") renderProgress();
     else if (safeTab === "partner") renderPartner();
+    else if (safeTab === "data") renderData();
     else renderToday();
   }
 
@@ -558,7 +559,165 @@
   }
 
   // ---------- Settings ----------
-  function openSettings() {
+  
+  // ---------- Data tab ----------
+  function renderData() {
+    setSubtitle("Dades i exportació");
+    view.innerHTML = "";
+
+    const state = loadState();
+    const entries = loadEntries();
+    const evidence = loadEvidence();
+
+    const card = el("div", { class: "card" }, [
+      el("h2", { text: "Exportar dades" }),
+      el("p", { text: "Les dades es guarden al teu dispositiu (localStorage). Aquí pots descarregar-les o compartir-les." }),
+      el("hr", { class: "sep" }),
+
+      el("div", { class: "task" }, [
+        el("div", { class: "meta" }, [
+          el("div", { class: "name", text: "Excel (CSV)" }),
+          el("div", { class: "desc", text: "Un fitxer CSV que s'obre amb Excel/Sheets. Inclou estat + registres + banc de proves." })
+        ]),
+        el("div", { class: "actions" }, [
+          el("button", { class: "mini", onClick: () => downloadCSV() }, "Descarregar"),
+          el("button", { class: "mini", onClick: () => shareCSV() }, "Enviar (WhatsApp/Email)")
+        ])
+      ]),
+
+      el("div", { class: "task" }, [
+        el("div", { class: "meta" }, [
+          el("div", { class: "name", text: "Còpia completa (JSON)" }),
+          el("div", { class: "desc", text: "Per fer còpia de seguretat o restaurar en un altre dispositiu." })
+        ]),
+        el("div", { class: "actions" }, [
+          el("button", { class: "mini", onClick: () => downloadJSON() }, "Descarregar")
+        ])
+      ]),
+
+      el("hr", { class: "sep" }),
+      el("h2", { text: "Resum" }),
+      el("p", { class: "note", text: `Nom: ${state.name || "—"} · Inici: ${state.startDate || "—"}` }),
+      el("p", { class: "note", text: `Registres guardats: ${Object.keys(entries).length} · Proves: ${evidence.length}` }),
+      el("div", { style: "height:10px" }),
+
+      el("button", { class: "ghost", onClick: () => openSettings() }, "Configuració / Reset"),
+      el("p", { class: "note", text: "Nota: si el botó 'Enviar' no funciona al teu mòbil, descarrega el CSV i comparteix-lo des del gestor de fitxers." })
+    ]);
+
+    view.appendChild(card);
+  }
+
+  function fileSafeName(s) {
+    return (s || "Usuari").trim().replace(/[^\p{L}\p{N}_-]+/gu, "_").slice(0, 40) || "Usuari";
+  }
+
+  function csvEscape(v) {
+    const s = (v === null || v === undefined) ? "" : String(v);
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  }
+
+  function buildCSV() {
+    const state = loadState();
+    const entries = loadEntries();
+    const evidence = loadEvidence();
+
+    const lines = [];
+    const push = (row) => lines.push(row.map(csvEscape).join(","));
+
+    // STATE
+    lines.push("SECCIÓ,CLAU,VALOR");
+    push(["STATE", "name", state.name || ""]);
+    push(["STATE", "startDate", state.startDate || ""]);
+    push(["STATE", "createdAt", state.createdAt || ""]);
+    lines.push("");
+
+    // EVIDENCE
+    lines.push("SECCIÓ,DATA,TEXT");
+    (evidence || []).forEach((e) => push(["EVIDENCE", e.date || "", e.text || ""]));
+    lines.push("");
+
+    // ENTRIES
+    lines.push("SECCIÓ,DATE,DAY_NUMBER,MOOD,ENERGY,RUMINATION,COMPLETED,NOTES_JSON,UPDATED_AT");
+    Object.keys(entries).sort().forEach((k) => {
+      const e = entries[k];
+      push([
+        "ENTRY",
+        e.date || k,
+        e.dayNumber ?? "",
+        e.mood ?? "",
+        e.energy ?? "",
+        e.rumination ?? "",
+        Array.isArray(e.completed) ? e.completed.join("|") : "",
+        JSON.stringify(e.notes || {}),
+        e.updatedAt || ""
+      ]);
+    });
+
+    return lines.join("\n");
+  }
+
+  function downloadBlob(filename, blob) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      URL.revokeObjectURL(a.href);
+      a.remove();
+    }, 0);
+  }
+
+  function downloadCSV() {
+    const state = loadState();
+    const name = fileSafeName(state.name);
+    const fn = `FIV-Calma-${name}-${todayISO()}.csv`;
+    const csv = buildCSV();
+    downloadBlob(fn, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  }
+
+  async function shareCSV() {
+    const state = loadState();
+    const name = fileSafeName(state.name);
+    const fn = `FIV-Calma-${name}-${todayISO()}.csv`;
+    const csv = buildCSV();
+    const file = new File([csv], fn, { type: "text/csv;charset=utf-8" });
+
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try {
+        await navigator.share({
+          title: "Dades FIV en Calma",
+          text: "Et passo el fitxer amb les dades (CSV) de l'app FIV en Calma.",
+          files: [file]
+        });
+        return;
+      } catch (_e) {
+        // cancel·lat o error; fem fallback
+      }
+    }
+
+    downloadBlob(fn, new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    alert("He descarregat el CSV. Ara el pots compartir manualment des del gestor de fitxers (WhatsApp/Email).");
+  }
+
+  function downloadJSON() {
+    const state = loadState();
+    const name = fileSafeName(state.name);
+    const fn = `FIV-Calma-${name}-${todayISO()}.json`;
+
+    const payload = {
+      exportedAt: new Date().toISOString(),
+      state: loadState(),
+      entries: loadEntries(),
+      evidence: loadEvidence()
+    };
+
+    downloadBlob(fn, new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" }));
+  }
+
+function openSettings() {
     const state = loadState();
     openModal("Configuració", el("div", {}, [
       el("p", { text: "Configuració bàsica." }),
